@@ -1,4 +1,5 @@
 = Experiments for Blackbox Program Tracing
+:source-highlighter: highlight.js
 
 Refer to `main`.
 
@@ -21,54 +22,54 @@ void my_func(const char* f = file_name(), int l = line()) {
 ----
 The output is
 
-[source]
+[source,text]
 ----
 my_func
  at []...]\consteval-source-location.cpp: 48
- ----
- Line 48 is the function definition for `my_func`, not the place where it is called.
+----
+Line 48 is the function definition for `my_func`, not the place where it is called.
 
- It is not the line or lines where line(...) and file_name(...) are defined.
- This is because both functions are consteval and so are immediately computed 
- where used.
+It is not the line or lines where line(...) and file_name(...) are defined.
+This is because both functions are consteval and so are immediately computed 
+where used.
 
- == func2() call
+== func2() call
 
- The code is
- [source,c++]
- ----
+The code is
+[source,c++]
+----
  void func2(const std::source_location& loc = std::source_location::current()) {
   std::cout << "func2 \n at " << loc.file_name() << ": " << loc.line() << std::endl;
 }
 ----
 Here the default location parameter is initialized directly in the function definition.
 
- The output is
- [source]
- ----
- func2
- at [...]\consteval-source-location.cpp: 162
- ----
- Here line 162 is where `func2` is called, as we might hope.
+The output is
+[source,text]
+----
+func2
+at [...]\consteval-source-location.cpp: 162
+----
+Here line 162 is where `func2` is called, as we might hope.
 
- == `bbtrace_simple` call
+== `bbtrace_simple` call
 
- The call:
- [source,c++]
- ----
- bbtrace_simple("Write these A{} B{} C{}", 41, 42, 43);
- ----
+The call:
+[source,c++]
+----
+bbtrace_simple("Write these A{} B{} C{}", 41, 42, 43);
+----
 
- The code:
- [source,c++]
- ----
- template <size_t N, typename... Ts>
- struct bbtrace_simple {
+The code:
+[source,c++]
+----
+template <size_t N, typename... Ts>
+struct bbtrace_simple {
   bbtrace_simple(
-    const char (&format_string)[N],
-    Ts&&... ts,
-    const std::source_location& loc =
-    std::source_location::current()
+      const char (&format_string)[N],
+      Ts&&... ts,
+      const std::source_location& loc =
+      std::source_location::current()
   ) {
     std::cout << "At " << loc.file_name() << ":" << loc.line() << ":";
     std::cout << std::vformat(format_string, std::make_format_args(ts...));
@@ -83,7 +84,7 @@ Here a template struct is used with a deduction guide to allow the default param
 the parameter pack.
 It also passes a format string so the results can be formatted.
 The resulting output is:
-[source]
+[source,text]
 ----
 At [...]\consteval-source-location.cpp:164:Write these A41 B42 C43
 ----
@@ -198,7 +199,7 @@ The final call is:
 Here we write out ("trace") a simple user-defined type, `int_wrapper`,
 that wraps an integer.
 To do this with `std::format`, a specialization of `std::formatter` is used:
-[source]
+[source,text]
 ----
 template <>
 struct std::formatter<int_wrapper> {
