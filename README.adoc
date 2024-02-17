@@ -1,0 +1,229 @@
+= Experiments for Blackbox Program Tracing
+
+Refer to `main`.
+
+== `my_func` call
+
+The code is
+[source,c++]
+----
+static consteval int line(const std::source_location& loc = std::source_location::current()) {
+  return loc.line();
+}
+
+static consteval const char* file_name(const std::source_location& loc = std::source_location::current()) {
+  return loc.file_name();
+}
+
+void my_func(const char* f = file_name(), int l = line()) {
+  std::cout << "my_func\n at " << f << ": " << l << std::endl;
+}
+----
+The output is
+
+[source]
+----
+my_func
+ at []...]\consteval-source-location.cpp: 48
+ ----
+ Line 48 is the function definition for `my_func`, not the place where it is called.
+
+ It is not the line or lines where line(...) and file_name(...) are defined.
+ This is because both functions are consteval and so are immediately computed 
+ where used.
+
+ == func2() call
+
+ The code is
+ [source,c++]
+ ----
+ void func2(const std::source_location& loc = std::source_location::current()) {
+  std::cout << "func2 \n at " << loc.file_name() << ": " << loc.line() << std::endl;
+}
+----
+Here the default location parameter is initialized directly in the function definition.
+
+ The output is
+ [source]
+ ----
+ func2
+ at [...]\consteval-source-location.cpp: 162
+ ----
+ Here line 162 is where `func2` is called, as we might hope.
+
+ == `bbtrace_simple` call
+
+ The call:
+ [source,c++]
+ ----
+ bbtrace_simple("Write these A{} B{} C{}", 41, 42, 43);
+ ----
+
+ The code:
+ [source,c++]
+ ----
+ template <size_t N, typename... Ts>
+ struct bbtrace_simple {
+  bbtrace_simple(
+    const char (&format_string)[N],
+    Ts&&... ts,
+    const std::source_location& loc =
+    std::source_location::current()
+  ) {
+    std::cout << "At " << loc.file_name() << ":" << loc.line() << ":";
+    std::cout << std::vformat(format_string, std::make_format_args(ts...));
+    std::cout << std::endl;
+  }
+};
+
+template <size_t N, typename... Ts>
+bbtrace_simple(const char (&fs)[N], Ts&&...) -> bbtrace_simple<N, Ts...>;
+----
+Here a template struct is used with a deduction guide to allow the default parameter to be declared after 
+the parameter pack.
+It also passes a format string so the results can be formatted.
+The resulting output is:
+[source]
+----
+At [...]\consteval-source-location.cpp:164:Write these A41 B42 C43
+----
+Here line 164 is the call site.
+
+== More complex example
+
+This is the main example.
+It is meant to model some of the main features of the blackbox tracing system.
+
+The system is represented overall by the type `blackbox_system`.
+One of these will be created at program start, effectively at the beginning of `main`.
+A reference to this object must be provided in all translation units 
+where trace calls are made so the objects related to the calls can be registered with the 
+system.
+
+In our simple case, we simply do
+[source,c++]
+----
+blackbox_system sys(100);
+----
+because there is only one translation unit.
+Here the number 100 is the maximum expected number of call sites.
+It is set large to avoid reallocation of the vector used to store call site objects.
+If such reallocation happens, it is reported.
+[source,c++]
+----
+struct bb;
+struct blackbox_system {
+  blackbox_system(size_t callsites_max):
+    callsites_mutex{},
+    callsites(callsites_max)
+  {}
+
+  void add_callsite(bb* callsite) {
+    std::scoped_lock<std::mutex> lock(callsites_mutex);
+    size_t c = callsites.capacity();
+    callsites.push_back(callsite);
+    if (callsites.capacity() > c) {
+      std::cout << std::format(
+        "INFO: Call site vector reallocated from {} to {}\n", 
+        c, callsites.capacity()
+      );
+    }
+  }
+  std::mutex callsites_mutex;
+  std::vector<bb*> callsites;
+};
+----
+The main type of interest is `bb`.
+[source,c++]
+----
+struct bb {
+  template<size_t N>
+  bb(
+    blackbox_system& sys_p,
+    const char (&format_string_p)[N],
+    const std::source_location& loc_p = std::source_location::current()
+  ):
+    sys(sys_p),
+    format_string(format_string_p),
+    call_count(0),
+    loc(loc_p)
+  {
+    sys.add_callsite(this);
+  }
+
+  void trace(traceable auto ... ts) {
+    {
+      std::scoped_lock lock(call_count_mutex);
+      if (call_count == 0) {
+
+      }
+      ++call_count;
+    }
+
+    std::cout << std::vformat(format_string, std::make_format_args(ts...));
+    std::cout << std::endl;
+  }
+
+  blackbox_system& sys;
+  const char *format_string;
+  std::source_location loc;
+
+  std::size_t call_count;
+  std::mutex call_count_mutex;
+};
+----
+It is used like this:
+[source,c++]
+----
+  {static bb* x = new bb(sys, "Write these D{} E{} F{}");
+  x->trace(100, 101, 102);}
+----
+Things to note:
+
+ * A scope is introduced to avoid the name of the call site object polluting the namespace.
+   All the callsite objects can use the same name.
+ * A `static` call site object is created. C++ guarantees that the assignment happens just once.
+ * In the constructor we store the system object reference and the format string.
+ * We also store the source location object, which refers to the constructor call.
+ * In the next statement the local values are recorded.
+   In this case, they are simply printed out.
+
+The final call is:
+[source,c++]
+----
+  int_wrapper n{ 0 };
+  {static bb* x = new bb(sys, "Write this good boy {}");
+  x->trace(n); }
+----
+Here we write out ("trace") a simple user-defined type, `int_wrapper`,
+that wraps an integer.
+To do this with `std::format`, a specialization of `std::formatter` is used:
+[source]
+----
+template <>
+struct std::formatter<int_wrapper> {
+  // for debugging only
+  formatter() { std::cout << "formatter<int_wrapper>()\n"; }
+
+  constexpr auto parse(std::format_parse_context& ctx) {
+    return ctx.begin();
+  }
+
+  auto format(const int_wrapper& v, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}", v.n);
+  }
+};
+----
+This came from https://www.cppstories.com/2022/custom-stdformat-cpp20/[cppstories].
+There are many other code fragments on the internet that try to do a similar thing, but
+this is the one that works.
+
+== Type-checking trace parameters
+`bb` contains the function definition `void trace(traceable auto ... ts)`.
+Here, `traceable` is a `concept`, defined as:
+[source,c++]
+----
+template <typename T> 
+concept traceable = std::integral<T> || std::same_as<int_wrapper, T>;
+----
+This definition uses two items from the `concepts` library.
