@@ -1,0 +1,30 @@
+##Load http_archive
+#
+#load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+#v1 = '0.4.2'
+#http_archive(
+#    name = "aspect_gcc_toolchain",
+#    #sha256 = "<sha256>", # Replace with the SHA-256 hash of the release tarball.
+#    strip_prefix = "gcc-toolchain-{}".format(v1), # Replace with the release version.
+#    urls = [
+#        # Replace with the release version.
+#        "https://github.com/aspect-build/gcc-toolchain/archive/{}.tar.gz".format(v1),
+#    ],
+#)
+#
+## Load gcc_toolchain_dependencies and run it
+#
+##load("@aspect_gcc_toolchain//toolchain:repositories.bzl", "gcc_toolchain_dependencies")
+#
+#gcc_toolchain_dependencies()
+#
+## Load gcc_register_toolchain and ARCHS, and register the toolchain
+## that is for making command-line programs
+
+#load("@aspect_gcc_toolchain//toolchain:defs.bzl", "gcc_register_toolchain", "ARCHS")
+
+#gcc_register_toolchain(
+#    name = "gcc_toolchain_x86_64",
+#    target_arch = ARCHS.x86_64,
+#)

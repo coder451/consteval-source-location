@@ -1,3 +1,11 @@
 x64/
 .vs/
 .vscode/
+**/.clwb/
+
+# Ignore symlinks - they are treated as files
+bazel-bin
+bazel-consteval-source-location
+bazel-out
+bazel-testlogs
+
