@@ -72,11 +72,12 @@ bbtrace_simple(const char (&fs)[N], Ts&&...) -> bbtrace_simple<N, Ts...>;
 
 struct bb;
 struct blackbox_system {
+  static blackbox_system* sys;
   blackbox_system(size_t callsites_max):
     callsites_mutex{},
     callsites(callsites_max)
   {
-
+    sys = this;
   }
 
   void add_callsite(bb* callsite) {
@@ -96,6 +97,7 @@ struct blackbox_system {
   std::vector<bb*> callsites;
 
 };
+blackbox_system* blackbox_system::sys = nullptr;
 
 struct bb {
   template<size_t N>
