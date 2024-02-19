@@ -87,7 +87,7 @@ struct blackbox_system {
     size_t c = callsites.capacity();
     callsites.push_back(callsite);
     if (callsites.capacity() > c) {
-      std::format("INFO: Call site vector reallocated from {} to {}\n", c, callsites.capacity());
+      auto result = std::format("INFO: Call site vector reallocated from {} to {}\n", c, callsites.capacity());
     }
   }
   // Counts all trace object instances, or equivalently, all trace call sites
@@ -105,9 +105,9 @@ struct bb {
     const std::source_location& loc_p = std::source_location::current()
   ):
     sys(sys_p),
+    loc(loc_p),
     format_string(format_string_p),
-    call_count(0),
-    loc(loc_p)
+    call_count(0)
   {
     sys.add_callsite(this);
   }
@@ -135,7 +135,6 @@ struct bb {
   blackbox_system& sys;
   const char *format_string;
   std::source_location loc;
-
   std::size_t call_count;
   std::mutex call_count_mutex;
 };
