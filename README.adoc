@@ -1,4 +1,4 @@
-= Experiments for Blackbox Program Tracing
+= Experiments for Blackbox Program Logging
 :source-highlighter: highlight.js
 
 Refer to `main`.
